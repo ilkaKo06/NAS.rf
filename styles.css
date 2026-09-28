@@ -5680,3 +5680,120 @@ html[lang="zh-CN"] .direction-card p { line-height: 1.72; }
     transform: none !important;
   }
 }
+
+/* =========================================================
+   v40 — постоянная орбита малых сред после раскрытия HERO
+   ========================================================= */
+/* После завершения веерного раскрытия JS переводит малые шары
+   в режим непрерывной орбиты. Текст не вращается: меняется только
+   позиция кругов вокруг центральной цифровой среды. */
+.hero-system--simple.is-orbiting .environment-slice:not(:nth-child(2)) {
+  transition: none !important;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-system--simple.is-orbiting .environment-slice:not(:nth-child(2)) {
+    will-change: auto;
+  }
+}
+
+/* =========================================================
+   v41 — бесшовная HERO-орбита после раскрытия
+   ========================================================= */
+.hero-system--simple.is-orbiting .environment-slice:not(:nth-child(2)) {
+  transition: none !important;
+  will-change: transform;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+
+/* =========================================================
+   v42 — HERO: прямое раскрытие по дуге в позиции 9/12/3/6
+   ========================================================= */
+/* Центральная цифровая среда немного компактнее. */
+.hero-system--simple .environment-slice:nth-child(2) {
+  width: 202px;
+  height: 202px;
+  padding: 29px 27px;
+}
+
+/* Малые сферы полностью позиционируются JS во время reveal и орбиты.
+   Старый промежуточный «веер слева» больше не участвует. */
+.hero-system--simple .environment-slice:not(:nth-child(2)) {
+  transition: none !important;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.72);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+
+.hero.hero-loaded .hero-system--simple .environment-slice:not(:nth-child(2)) {
+  transition: none !important;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.72);
+}
+
+.hero-system--simple.is-orbiting .environment-slice:not(:nth-child(2)),
+.hero-system--simple.is-revealing-orbit .environment-slice:not(:nth-child(2)) {
+  transition: none !important;
+  will-change: transform, opacity;
+}
+
+@media (max-width: 620px) {
+  .hero-system--simple .environment-slice:nth-child(2) {
+    width: 142px;
+    height: 142px;
+    padding: 20px 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-system--simple .environment-slice:not(:nth-child(2)),
+  .hero.hero-loaded .hero-system--simple .environment-slice:not(:nth-child(2)) {
+    opacity: 1 !important;
+    will-change: auto !important;
+  }
+}
+
+/* =========================================================
+   v43 — HERO: возврат размера центра + раскрытие с левой дуги
+   ========================================================= */
+/* Возвращаем центральную цифровую среду к прежнему размеру. */
+.hero-system--simple .environment-slice:nth-child(2) {
+  width: 264px;
+  height: 264px;
+  padding: 38px 36px;
+}
+
+.hero-system--simple .environment-slice:nth-child(2) > span {
+  font-size: 12px;
+}
+.hero-system--simple .environment-slice:nth-child(2) h3 {
+  font-size: 29px;
+  margin: 13px 0 9px;
+}
+.hero-system--simple .environment-slice:nth-child(2) p {
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 172px;
+}
+
+@media (max-width: 1180px) {
+  .hero-system--simple .environment-slice:nth-child(2) {
+    width: 238px;
+    height: 238px;
+    padding: 34px 31px;
+  }
+}
+
+@media (max-width: 620px) {
+  .hero-system--simple .environment-slice:nth-child(2) {
+    width: 168px;
+    height: 168px;
+    padding: 24px 22px;
+  }
+  .hero-system--simple .environment-slice:nth-child(2) h3 { font-size: 19px; }
+  .hero-system--simple .environment-slice:nth-child(2) p { font-size: 9px; max-width: 112px; }
+}

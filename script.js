@@ -1033,3 +1033,169 @@ langButtons.forEach((btn) => {
 
 const savedLanguage = localStorage.getItem('nas-language');
 setLanguage(['ru','en','zh'].includes(savedLanguage) ? savedLanguage : 'ru');
+
+/* =========================================================
+   v43 — HERO: малые сферы выходят с левой дуги и сразу занимают
+   часовые позиции; затем движение продолжается бесшовно.
+   ========================================================= */
+(() => {
+  if (reduceMotion || !hero) return;
+
+  const system = hero.querySelector('.hero-system--simple');
+  const slices = system ? [...system.querySelectorAll('.environment-slice')] : [];
+  const bigSlice = slices[1];
+  const smallSlices = slices.filter((_, index) => index !== 1);
+  if (!system || !bigSlice || smallSlices.length !== 4) return;
+
+  const REVEAL_LEAD = 420;
+  const REVEAL_DURATION = 2450;
+
+  /* Постоянное вращение — достаточно живое, но текст остаётся читаемым. */
+  const ORBIT_DURATION = 44000;
+  const angularSpeed = -(Math.PI * 2) / ORBIT_DURATION;
+
+  /* Все начинают слева, чуть ниже позиции «9 часов».
+     Дальше идут ПРОТИВ часовой стрелки по одной и той же дуге.
+     Поэтому каждый следующий проходит больший путь за то же время:
+     1-й -> 9, 2-й -> 6, 3-й -> 3, 4-й -> 12. */
+  const START_ANGLE = Math.PI + 0.28;
+  const endAngles = [
+    Math.PI,          // 9 часов
+    Math.PI / 2,      // 6 часов
+    0,                // 3 часа
+    -Math.PI / 2,     // 12 часов
+  ];
+
+  /* Стартуем уже на внешней дуге, а не из центра. Небольшое изменение
+     радиуса только добавляет ощущение раскрытия, но не создаёт скачка. */
+  const START_RADIUS_FACTOR = 0.78;
+
+  let revealScheduledAt = 0;
+  let revealStartedAt = 0;
+  let orbitRadius = 0;
+  let rafId = 0;
+  let wasLoaded = false;
+
+  const clamp01 = (value) => Math.max(0, Math.min(1, value));
+  const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+
+  /*
+     Кубическая интерполяция угла нужна именно для бесшовного перехода:
+     в конце раскрытия шар уже имеет ту же угловую скорость, с которой
+     продолжит постоянное вращение. Поэтому в точке стыка нет остановки.
+  */
+  const hermiteAngle = (start, end, u) => {
+    const delta = end - start;
+    const h00 = 2 * u * u * u - 3 * u * u + 1;
+    const h10 = u * u * u - 2 * u * u + u;
+    const h01 = -2 * u * u * u + 3 * u * u;
+    const h11 = u * u * u - u * u;
+
+    /* Стартовое движение мягкое, но не «из состояния покоя».
+       Чем дальше конечная точка, тем выше начальная скорость —
+       поэтому веер ощущается естественно. */
+    const startVelocity = delta * 0.28;
+    const endVelocity = angularSpeed * REVEAL_DURATION;
+
+    return h00 * start + h10 * startVelocity + h01 * end + h11 * endVelocity;
+  };
+
+  const calculateRadius = () => {
+    const bigRadius = bigSlice.getBoundingClientRect().width / 2;
+    const smallRadius = smallSlices.reduce((sum, slice) => {
+      return sum + slice.getBoundingClientRect().width / 2;
+    }, 0) / smallSlices.length;
+
+    /* Явный воздушный зазор между цифровой средой и малыми шарами. */
+    const gap = window.innerWidth <= 620 ? 26 : window.innerWidth <= 1180 ? 40 : 54;
+    return bigRadius + smallRadius + gap;
+  };
+
+  const applyPoint = (slice, x, y, scale = 1, opacity = 1) => {
+    slice.style.transform = `translate(calc(-50% + ${x.toFixed(2)}px), calc(-50% + ${y.toFixed(2)}px)) scale(${scale.toFixed(4)})`;
+    slice.style.opacity = opacity.toFixed(4);
+  };
+
+  const clearOrbit = () => {
+    system.classList.remove('is-orbiting', 'is-revealing-orbit');
+    smallSlices.forEach((slice) => {
+      slice.style.removeProperty('transform');
+      slice.style.removeProperty('opacity');
+    });
+    revealScheduledAt = 0;
+    revealStartedAt = 0;
+    orbitRadius = 0;
+  };
+
+  const startReveal = (now) => {
+    revealStartedAt = now;
+    orbitRadius = calculateRadius();
+    system.classList.add('is-revealing-orbit');
+  };
+
+  const frame = (now) => {
+    const loaded = hero.classList.contains('hero-loaded');
+
+    if (loaded && !wasLoaded) {
+      clearOrbit();
+      revealScheduledAt = now + REVEAL_LEAD;
+    } else if (!loaded && wasLoaded) {
+      clearOrbit();
+    }
+    wasLoaded = loaded;
+
+    if (loaded) {
+      if (!revealStartedAt && revealScheduledAt && now >= revealScheduledAt) {
+        startReveal(now);
+      }
+
+      if (revealStartedAt) {
+        const elapsed = now - revealStartedAt;
+        const u = clamp01(elapsed / REVEAL_DURATION);
+        const eased = easeOutCubic(u);
+        const radius = orbitRadius * (START_RADIUS_FACTOR + (1 - START_RADIUS_FACTOR) * eased);
+        const scale = .88 + .12 * eased;
+
+        smallSlices.forEach((slice, index) => {
+          const endAngle = endAngles[index];
+          let angle;
+
+          if (u < 1) {
+            /* Все стартуют с левой дуги, но каждый проходит свою длину пути.
+               В самой конечной точке скорость уже совпадает с орбитальной,
+               поэтому раскрытие буквально перетекает в постоянное вращение. */
+            angle = hermiteAngle(START_ANGLE, endAngle, u);
+          } else {
+            angle = endAngle + angularSpeed * (elapsed - REVEAL_DURATION);
+          }
+
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius;
+
+          /* Проявление почти одновременное — ощущение единого веера. */
+          const opacityT = clamp01(elapsed / 760);
+          const opacity = 1 - Math.pow(1 - opacityT, 3);
+
+          applyPoint(slice, x, y, scale, opacity);
+        });
+
+        if (u >= 1 && !system.classList.contains('is-orbiting')) {
+          system.classList.remove('is-revealing-orbit');
+          system.classList.add('is-orbiting');
+        }
+      }
+    }
+
+    rafId = requestAnimationFrame(frame);
+  };
+
+  rafId = requestAnimationFrame(frame);
+
+  window.addEventListener('resize', () => {
+    if (revealStartedAt) orbitRadius = calculateRadius();
+  }, { passive: true });
+
+  window.addEventListener('pagehide', () => {
+    if (rafId) cancelAnimationFrame(rafId);
+  }, { once: true });
+})();
